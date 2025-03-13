@@ -105,23 +105,23 @@ hacky_cleaning <- function(text) {
 
 # Gather list of grants from synapse
 grants <-
-  syn$tableQuery(glue::glue("SELECT grantNumber, program, name FROM {sid_projects_table}"))$asDataFrame()
+  syn$tableQuery(glue::glue("SELECT grant, program, name FROM {sid_projects_table}"))$asDataFrame()
 
 # convert grant numbers into string
 library(comprehenr)
 grantNumbers <-
-  to_list(for (g in grants$grantNumber)
+  to_list(for (g in grants$grant)
     for (y in g)
       y)
 
 # expand rows with multiple grantNumbers
-grants$grantNumber <-
-  purrr::map(grants$grantNumber, function(x) {
+grants$grant <-
+  purrr::map(grants$grant, function(x) {
     paste(unlist(x), collapse = ",")
   })
 
 grants <- grants %>%
-  separate_rows(grantNumber)
+  separate_rows(grant)
 
 ## ----scrape pubmed ids from grant numbers---------------------------------------------------------------------------------------------------------------------------------------------
 get_pub_details <- function(request_body) {
@@ -157,7 +157,7 @@ headers <- list(accept = "application/json",
 
 # Set the request body
 request_body <- list(
-  criteria = list(core_project_nums = grantNumbers),
+  criteria = list(core_project_nums = grant),
   offset = 0,
   limit = 50,
   sort_field = "core_project_nums",
@@ -211,10 +211,10 @@ if (response$status_code == 200) {
 # create dataframe with pmids
 pmids_df <- do.call(rbind, pmids)
 
-pmids_df <- pmids_df %>% rename('grantNumber' = 'coreproject')
+pmids_df <- pmids_df %>% rename('grant' = 'coreproject')
 
 # for joining
-pmids_df$grantNumber <- as.character(pmids_df$grantNumber)
+pmids_df$grant <- as.character(pmids_df$grant)
 
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -224,7 +224,7 @@ pmid_metadata <- pub_query(pmids_df$pmid)
 
 ## ----query----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # create complete dataset
-dat <- dplyr::right_join(grants, pmids_df, by = "grantNumber")
+dat <- dplyr::right_join(grants, pmids_df, by = "grant")
 
 dat$pmid <- as.character(dat$pmid)
 
@@ -263,9 +263,9 @@ cat(
 # Includes some renaming and dropping of columns
 dat <- dat %>%
   group_by(pmid) %>%
-  mutate(grant = glue::glue_collapse(unique(.data$`grantNumber`), ", ")) %>%
+  mutate(grant = glue::glue_collapse(unique(.data$`grant`), ", ")) %>%
   mutate(consortium = glue::glue_collapse(unique(.data$program), ", ")) %>%
-  select(!c(grantNumber, program)) %>%
+  select(!c(program)) %>%
   rename(
     pubmed_id = pmid,
     DOI = doi,
