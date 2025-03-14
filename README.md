@@ -7,6 +7,12 @@ Sage portals require content management of publications, people, data, studies a
 
 `devtools::install_github('Sage-Bionetworks/porTools')`
 
+## Usage
+You will want to run this tool via the command line in the terminal.
+
+```
+Rscript ./inst/scripts/query-pubmed-grants.R --grant_table syn51209786 --parent syn51317180 --pub_table syn51407023
+```
 
 ## Updates
 **2023-10-10**
