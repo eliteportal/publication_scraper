@@ -1,6 +1,13 @@
 ## ----setup, include = FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------
-install.packages('librarian')
-install.packages("synapser", repos=c("http://ran.synapse.org", "http://cran.fhcrc.org"))
+options(repos = c(CRAN = "https://cloud.r-project.org/"))
+
+remotes::install_cran('librarian')
+remotes::install_version('rjson', version='0.2.21')
+remotes::install_version('reticulate', version='1.28')
+# reticulate::py_config() # this installs miniconda
+remotes::install_cran("synapser", repos = c("http://ran.synapse.org", "https://cloud.r-project.org"))
+
+# install.packages("synapser", repos=c("http://ran.synapse.org", "http://cran.fhcrc.org"))
 
 librarian::shelf(
   optparse,
