@@ -69,7 +69,6 @@ grant_query <- function(grant_serial_nums, max = 99999) {
 
 pub_query <- function(pub_pmids_list) {
   message("Querying PubMed for Publication Metadata")
-
   # initialize progress bar
   total <- length(pub_pmids_list)
   pb <- txtProgressBar(min = 0, max = total, style = 3)
@@ -85,6 +84,7 @@ pub_query <- function(pub_pmids_list) {
                               id = pub_pmids_list[[i]],
                               always_return_list = TRUE)
     }, error = function(e) {
+      message("Error encountered: ", e$message)
       return(NA)
     })
 

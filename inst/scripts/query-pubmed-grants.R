@@ -1,10 +1,9 @@
 ## ----setup, include = FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------
 options(repos = c(CRAN = "https://cloud.r-project.org/"))
-
+remotes::install_cran('rentrez')
 remotes::install_cran('librarian')
 remotes::install_version('rjson', version='0.2.21')
 remotes::install_version('reticulate', version='1.28')
-# reticulate::py_config() # this installs miniconda
 remotes::install_cran("synapser", repos = c("http://ran.synapse.org", "https://cloud.r-project.org"))
 
 # install.packages("synapser", repos=c("http://ran.synapse.org", "http://cran.fhcrc.org"))
@@ -227,11 +226,12 @@ pmids_df <- pmids_df %>% group_by(pmid) %>% reframe(
 # Take only pmids not in the portal already
 pmids_df <-
   pmids_df[!(pmids_df$pmid %in% pubs_exisiting$PubmedId),]
-
+if (nrow(pmids_df) == 0) {
+  stop("All pmids already in the portal")
+}
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # one eternity later....
 pmid_metadata <- pub_query(pmids_df$pmid)
-
 ## ----query----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # create complete dataset
 dat <- dplyr::right_join(grants, pmids_df, by = "grant")
@@ -255,7 +255,6 @@ dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
 
 # drop unnecessary columns
 dat <- dat %>% select(-c('applid', 'result', 'pubdate'))
-
 cat(
   'Total rows: ',
   nrow(dat),
@@ -274,7 +273,7 @@ dat <- dat %>%
   mutate(grant = glue::glue_collapse(unique(.data$`grant`), ", ")) %>%
   mutate(consortium = glue::glue_collapse(unique(.data$program), ", ")) %>%
   mutate(name = glue::glue_collapse(unique(.data$name), ", ")) %>%
-  select(!c(grant, program)) %>%
+  select(!c(program)) %>%
   rename(
     pubmed_id = pmid,
     DOI = doi,
@@ -326,6 +325,5 @@ store_as_annotations <- function(parent, list) {
 ## ----store, message=FALSE, echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------
 # parent = "syn51317180" # ELITE publications folder
 dat_list <- purrr::transpose(dat)
-
 # another eternity
 store_as_annotations(parent = sid_pub_folder, dat_list)
