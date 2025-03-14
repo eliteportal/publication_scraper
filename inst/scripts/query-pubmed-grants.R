@@ -11,13 +11,10 @@ remotes::install_cran("synapser", repos = c("http://ran.synapse.org", "https://c
 librarian::shelf(
   optparse,
   rmarkdown,
-  reticulate,
   janitor,
   dplyr,
   readr,
   stringr,
-  reticulate,
-  synapser,
   easyPubMed,
   comprehenr,
   easyPubMed,
