@@ -64,7 +64,7 @@ jobs:
 
       - name: Update OpenSSL in Conda
         run: |
-          /home/runner/.local/share/r-miniconda/bin/conda install --yes -c conda-forge openssl
+          /home/runner/.local/share/r-miniconda/bin/conda install --yes -c conda-forge "openssl>=3.3.0"
 
       # - name: Install Miniconda
       #   run: |
