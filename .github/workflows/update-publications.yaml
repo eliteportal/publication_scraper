@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
+      # - name: Set up Python
+      #   uses: actions/setup-python@v4
+      #   with:
+      #     python-version: "3.10"
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: '4.3.1'
@@ -40,11 +40,10 @@ jobs:
                 libssh2-1-dev \
                 zlib1g-dev \
                 libgit2-dev \
-                openssl
-                # python3 \
-                # python3-dev \
-                # python3-pip \
-                # python3-venv
+                python3 \
+                python3-dev \
+                python3-pip \
+                python3-venv
                 # pandoc-citeproc
 
       - name: Install dependencies

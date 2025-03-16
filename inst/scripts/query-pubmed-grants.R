@@ -17,13 +17,11 @@ librarian::shelf(
   stringr,
   easyPubMed,
   comprehenr,
-  easyPubMed,
   httr,
   tidyr,
-  dplyr
 )
 
-# library('synapser')
+library('synapser')
 
 # nolint start
 option_list <- list(
@@ -67,9 +65,9 @@ source(glue::glue("{base_dir}/R/global-hard-coded-variables.R"))
 
 # Login to synapse
 ## Synapse client and logging in
-synapseclient <- reticulate::import("synapseclient")
-syntab <- reticulate::import("synapseclient.table")
-syn <- synapseclient$Synapse()
+# synapseclient <- reticulate::import("synapseclient")
+# syntab <- reticulate::import("synapseclient.table")
+# syn <- synapseclient$Synapse()
 if (!is.na(opts$auth_token)) {
   syn$login(authToken = opts$auth_token)
 } else {
