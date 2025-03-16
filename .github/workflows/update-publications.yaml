@@ -60,6 +60,10 @@ jobs:
           # update(deps)
         shell: Rscript {0}
 
+      - name: Update OpenSSL in Conda
+        run: |
+          /home/runner/.local/share/r-miniconda/bin/conda install --yes -c conda-forge openssl
+
       # - name: Install Miniconda
       #   run: |
       #     Rscript -e "remotes::install_github('rstudio/reticulate')"
