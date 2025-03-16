@@ -7,11 +7,28 @@ Sage portals require content management of publications, people, data, studies a
 
 `devtools::install_github('Sage-Bionetworks/porTools')`
 
+## Installation instructions
+
+These are the instructions for installing the dependencies for this project. You will need to have R and RStudio installed on your computer. You will also need to have an account on Synapse.
+
+```
+install.packages('remotes')
+remotes::install_cran('rentrez')
+remotes::install_cran('librarian')
+remotes::install_version('rjson', version='0.2.21')
+remotes::install_version('reticulate', version='1.28')
+reticulate::install_miniconda()
+remotes::install_cran("synapser", repos = c("http://ran.synapse.org", "https://cloud.r-project.org"))
+```
+
 ## Usage
 You will want to run this tool via the command line in the terminal.
 
 ```
-Rscript ./inst/scripts/query-pubmed-grants.R --grant_table syn51209786 --parent syn51317180 --pub_table syn51407023
+Rscript ./inst/scripts/query-pubmed-grants.R \
+    --grant_table syn51209786 \
+    --parent syn51317180 \
+    --pub_table syn51407023
 ```
 
 ## Updates
