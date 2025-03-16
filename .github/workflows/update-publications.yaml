@@ -53,9 +53,8 @@ jobs:
           reticulate::conda_remove("r-reticulate")
           # Create a new Conda environment with Python 3.10
           reticulate::conda_create("r-reticulate", python_version = "3.10")
-          # Must install a newer version of openssl or else
-          # Error: Error: ImportError: /usr/lib/x86_64-linux-gnu/libcrypto.so.3: version OPENSSL_3.3.0'
-          # error occurs
+          # Must install a newer version of openssl or else this error occurs:
+          # ImportError: /usr/lib/x86_64-linux-gnu/libcrypto.so.3: version OPENSSL_3.3.0'
           reticulate::conda_install("r-reticulate", packages = c("openssl=3.3.0"), channel = "conda-forge")
 
           # Force reticulate to use the new environment
