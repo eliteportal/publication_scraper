@@ -31,7 +31,15 @@ Rscript ./inst/scripts/query-pubmed-grants.R \
     --pub_table syn51407023
 ```
 
+## Automation
+There is a github action [updated-publications.yaml](.github/workflows/updated-publications.yaml) that runs this script on a schedule. It will automatically run the above command on a monthly basis.  The script is ran via the Synapse service user: `synapse-service-dpe-team`.
+
+Important notes about the github action:
+* It will stop after 60 days if there are no pushes to this repository. (This is a Github limitation.)
+* The action will fail with "Error: All pmids already in the portal" if there are no pmids to add to the portal.
+
 ## Updates
+
 **2023-10-10**
 - If the grant serial number overlaps with annother for example `UH2AG064706` and `UH3AG064706` then a different call to get the search results must be made and the previously developed functions do not work 
 - Found the NIH library for R is much faster than python 
