@@ -65,6 +65,8 @@ source(glue::glue("{base_dir}/R/global-hard-coded-variables.R"))
 
 # Login to synapse
 ## Synapse client and logging in
+cat("use reticulate")
+reticulate::use_condaenv("r-reticulate", required=TRUE)
 cat("Logging in to Synapse")
 synapseclient <- reticulate::import("synapseclient")
 # syntab <- reticulate::import("synapseclient.table")
