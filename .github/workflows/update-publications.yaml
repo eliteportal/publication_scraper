@@ -59,6 +59,8 @@ jobs:
           # }
           # Create a new Conda environment with Python 3.10
           reticulate::conda_create("r-reticulate", python_version = "3.10")
+          reticulate::conda_install("r-reticulate", packages = c("openssl=3.3.0"), channel = "conda-forge")
+
           # Force reticulate to use the new environment
           reticulate::use_condaenv("r-reticulate", required=TRUE)
           reticulate::py_config()
