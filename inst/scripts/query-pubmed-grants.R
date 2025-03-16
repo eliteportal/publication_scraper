@@ -1,10 +1,10 @@
 ## ----setup, include = FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------
-options(repos = c(CRAN = "https://cloud.r-project.org/"))
-remotes::install_cran('rentrez')
-remotes::install_cran('librarian')
-remotes::install_version('rjson', version='0.2.21')
-remotes::install_version('reticulate', version='1.28')
-remotes::install_cran("synapser", repos = c("http://ran.synapse.org", "https://cloud.r-project.org"))
+# options(repos = c(CRAN = "https://cloud.r-project.org/"))
+# remotes::install_cran('rentrez')
+# remotes::install_cran('librarian')
+# remotes::install_version('rjson', version='0.2.21')
+# remotes::install_version('reticulate', version='1.28')
+# remotes::install_cran("synapser", repos = c("http://ran.synapse.org", "https://cloud.r-project.org"))
 
 # install.packages("synapser", repos=c("http://ran.synapse.org", "http://cran.fhcrc.org"))
 
@@ -23,7 +23,7 @@ librarian::shelf(
   dplyr
 )
 
-library('synapser')
+# library('synapser')
 
 # nolint start
 option_list <- list(
