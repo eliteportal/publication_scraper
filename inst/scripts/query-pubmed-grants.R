@@ -65,7 +65,7 @@ source(glue::glue("{base_dir}/R/global-hard-coded-variables.R"))
 
 # Login to synapse
 ## Synapse client and logging in
-reticulate::use_condaenv("r-reticulate", required=TRUE)
+# reticulate::use_condaenv("r-reticulate", required=TRUE)
 synapseclient <- reticulate::import("synapseclient")
 # syntab <- reticulate::import("synapseclient.table")
 syn <- synapseclient$Synapse()
@@ -324,3 +324,12 @@ if (nrow(pmids_df) == 0) {
   # another eternity
   store_as_annotations(parent = sid_pub_folder, dat_list=dat_list)
 }
+
+# For some reason there is a warning about leaded semaphore that is
+# leading to the process to never finish.
+reticulate::py_run_string("
+import warnings
+
+# Suppress specific multiprocessing warnings
+warnings.filterwarnings('ignore', message='resource_tracker: There appear to be .*')
+")

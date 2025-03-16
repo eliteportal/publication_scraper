@@ -36,7 +36,6 @@ There is a github action [updated-publications.yaml](.github/workflows/updated-p
 
 Important notes about the github action:
 * It will stop after 60 days if there are no pushes to this repository. (This is a Github limitation.)
-* The action will fail with "Error: All pmids already in the portal" if there are no pmids to add to the portal.
 
 ## Updates
 
