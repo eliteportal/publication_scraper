@@ -53,7 +53,7 @@ jobs:
           remotes::install_cran('librarian')
           remotes::install_version('rjson', version='0.2.21')
           remotes::install_version('reticulate', version='1.28')
-          reticulate::py_config()
+          reticulate::install_miniconda()
           remotes::install_cran("synapser", repos = c("http://ran.synapse.org", "https://cloud.r-project.org"))
           # deps <- readRDS('depends.Rds')
           # deps[['installed']] <- vapply(deps[['package']], remotes:::local_sha, character(1))
