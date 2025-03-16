@@ -1,4 +1,4 @@
-## ----setup, include = FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----setup, include = FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------
 # options(repos = c(CRAN = "https://cloud.r-project.org/"))
 # remotes::install_cran('rentrez')
 # remotes::install_cran('librarian')
@@ -65,9 +65,7 @@ source(glue::glue("{base_dir}/R/global-hard-coded-variables.R"))
 
 # Login to synapse
 ## Synapse client and logging in
-cat("use reticulate")
 reticulate::use_condaenv("r-reticulate", required=TRUE)
-cat("Logging in to Synapse")
 synapseclient <- reticulate::import("synapseclient")
 # syntab <- reticulate::import("synapseclient.table")
 syn <- synapseclient$Synapse()
@@ -76,7 +74,6 @@ if (!is.na(opts$auth_token)) {
 } else {
   syn$login()
 }
-cat("Logged in")
 
 ## ----functions------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 hacky_cleaning <- function(text) {
@@ -225,104 +222,105 @@ pmids_df <- pmids_df %>% group_by(pmid) %>% reframe(
 # Take only pmids not in the portal already
 pmids_df <-
   pmids_df[!(pmids_df$pmid %in% pubs_exisiting$PubmedId),]
+
 if (nrow(pmids_df) == 0) {
-  stop("All pmids already in the portal")
-}
-## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# one eternity later....
-pmid_metadata <- pub_query(pmids_df$pmid)
-## ----query----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# create complete dataset
-dat <- dplyr::right_join(grants, pmids_df, by = "grant")
+  print("All pmids already in the portal")
+} else {
+  ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  # one eternity later....
+  pmid_metadata <- pub_query(pmids_df$pmid)
+  ## ----query----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  # create complete dataset
+  dat <- dplyr::right_join(grants, pmids_df, by = "grant")
 
-dat$pmid <- as.character(dat$pmid)
+  dat$pmid <- as.character(dat$pmid)
 
-dat <- dplyr::inner_join(dat, pmid_metadata, by = "pmid")
+  dat <- dplyr::inner_join(dat, pmid_metadata, by = "pmid")
 
-# clean column names
-dat <- janitor::clean_names(dat, "lower_camel")
+  # clean column names
+  dat <- janitor::clean_names(dat, "lower_camel")
 
-## ----hacky----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# Included in hacky_cleaning is conversion to ascii and removing html formatting
-dat$year <- stringr::str_extract(dat$pubdate, "\\d{4}")
-dat$year <- as.integer(dat$year)
-dat$title <- hacky_cleaning(dat$title)
-dat$authors <- hacky_cleaning(dat$authors)
-dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
+  ## ----hacky----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  # Included in hacky_cleaning is conversion to ascii and removing html formatting
+  dat$year <- stringr::str_extract(dat$pubdate, "\\d{4}")
+  dat$year <- as.integer(dat$year)
+  dat$title <- hacky_cleaning(dat$title)
+  dat$authors <- hacky_cleaning(dat$authors)
+  dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
 
-# dat$abstract <- hacky_cleaning(dat$abstract)
+  # dat$abstract <- hacky_cleaning(dat$abstract)
 
-# drop unnecessary columns
-dat <- dat %>% select(-c('applid', 'result', 'pubdate'))
-cat(
-  'Total rows: ',
-  nrow(dat),
-  '\n',
-  'Duplicates: ',
-  sum(dat %>% duplicated()),
-  '\n',
-  'Rows after duplicate remove: ',
-  nrow(dat) - sum(dat %>% duplicated())
-)
-
-# Need to remove duplicates, but keep all grants and consortium
-# Includes some renaming and dropping of columns
-dat <- dat %>%
-  group_by(pmid) %>%
-  mutate(grant = glue::glue_collapse(unique(.data$`grant`), ", ")) %>%
-  mutate(consortium = glue::glue_collapse(unique(.data$program), ", ")) %>%
-  mutate(name = glue::glue_collapse(unique(.data$name), ", ")) %>%
-  select(!c(program)) %>%
-  rename(
-    pubmed_id = pmid,
-    DOI = doi,
-    program = consortium,
-    study = name
-  ) %>%
-  distinct()
-
-dat <- dat %>% rename('pmid' = 'pubmed_id')
-dat$entity_name <- make_entity_name(dat)
-dat$Name <- make_entity_name(dat)
-
-
-#Using rename()
-dat <- dat %>% rename(
-  "Authors" = "authors",
-  "Journal" = "journal",
-  "PubmedId" = "pmid",
-  "Title" = "title",
-  "Year" = "year",
-  "Program" = "program",
-)
-
-# Remove common, unallowed characters from entity name; includes hacky_cleaning
-dat$entity_name <- remove_unacceptable_characters(dat$entity_name)
-
-## ----columns--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-dat <- set_up_multiannotations(dat, "grant")
-dat <- set_up_multiannotations(dat, "Program")
-dat <- set_up_multiannotations(dat, "Authors")
-
-
-## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-store_as_annotations <- function(parent, list) {
-  entity <- purrr::map(
-    list,
-    ~ synapseclient$File(
-      path = glue::glue("http://doi.org/{.$DOI}"),
-      name = .$entity_name,
-      parent = parent,
-      synapseStore = FALSE,
-      annotations = .
-    )
+  # drop unnecessary columns
+  dat <- dat %>% select(-c('applid', 'result', 'pubdate'))
+  cat(
+    'Total rows: ',
+    nrow(dat),
+    '\n',
+    'Duplicates: ',
+    sum(dat %>% duplicated()),
+    '\n',
+    'Rows after duplicate remove: ',
+    nrow(dat) - sum(dat %>% duplicated())
   )
-  # entity
-  purrr::map(entity, ~ syn$store(., forceVersion = FALSE))
-}
 
-## ----store, message=FALSE, echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------
-# parent = "syn51317180" # ELITE publications folder
-dat_list <- purrr::transpose(dat)
-# another eternity
-store_as_annotations(parent = sid_pub_folder, dat_list)
+  # Need to remove duplicates, but keep all grants and consortium
+  # Includes some renaming and dropping of columns
+  dat <- dat %>%
+    group_by(pmid) %>%
+    mutate(grant = glue::glue_collapse(unique(.data$`grant`), ", ")) %>%
+    mutate(consortium = glue::glue_collapse(unique(.data$program), ", ")) %>%
+    mutate(name = glue::glue_collapse(unique(.data$name), ", ")) %>%
+    select(!c(program)) %>%
+    rename(
+      pubmed_id = pmid,
+      DOI = doi,
+      program = consortium,
+      study = name
+    ) %>%
+    distinct()
+
+  dat <- dat %>% rename('pmid' = 'pubmed_id')
+  dat$entity_name <- make_entity_name(dat)
+  dat$Name <- make_entity_name(dat)
+
+
+  #Using rename()
+  dat <- dat %>% rename(
+    "Authors" = "authors",
+    "Journal" = "journal",
+    "PubmedId" = "pmid",
+    "Title" = "title",
+    "Year" = "year",
+    "Program" = "program",
+  )
+
+  # Remove common, unallowed characters from entity name; includes hacky_cleaning
+  dat$entity_name <- remove_unacceptable_characters(dat$entity_name)
+
+  ## ----columns--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  dat <- set_up_multiannotations(dat, "grant")
+  dat <- set_up_multiannotations(dat, "Program")
+  dat <- set_up_multiannotations(dat, "Authors")
+
+  ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  store_as_annotations <- function(parent, dat_list) {
+    entity <- purrr::map(
+      dat_list,
+      ~ synapseclient$File(
+        path = glue::glue("http://doi.org/{.$DOI}"),
+        name = .$entity_name,
+        parent = parent,
+        synapseStore = FALSE,
+        annotations = .
+      )
+    )
+    # entity
+    purrr::map(entity, ~ syn$store(., forceVersion = FALSE))
+  }
+
+  ## ----store, message=FALSE, echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------
+  # parent = "syn51317180" # ELITE publications folder
+  dat_list <- purrr::transpose(dat)
+  # another eternity
+  store_as_annotations(parent = sid_pub_folder, dat_list=dat_list)
+}
