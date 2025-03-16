@@ -36,6 +36,8 @@ There is a github action [updated-publications.yaml](.github/workflows/updated-p
 
 Important notes about the github action:
 * It will stop after 60 days if there are no pushes to this repository. (This is a Github limitation.)
+* Look at the results of the "Query PubMed and upload results" section in each of the executions in the "Actions" tab.
+  There will be `[1] "All pmids already in the portal"` printed at the end if there is no pmids to update.
 
 ## Updates
 

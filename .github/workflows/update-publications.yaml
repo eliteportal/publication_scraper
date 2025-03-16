@@ -1,9 +1,6 @@
 name: "Update Publications"
 
 on:
-  push:
-    branches:
-      - dpe-1262-fix-pub-script
   schedule:
     - cron: "0 0 1 * *"
   workflow_dispatch:
