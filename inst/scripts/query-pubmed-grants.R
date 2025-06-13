@@ -247,11 +247,11 @@ if (nrow(pmids_df) == 0) {
   dat$title <- hacky_cleaning(dat$title)
   dat$authors <- hacky_cleaning(dat$authors)
   dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
-
-  # dat$abstract <- hacky_cleaning(dat$abstract)
+  dat$abstract <- hacky_cleaning(dat$abstract)
+  dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
 
   # drop unnecessary columns
-  dat <- dat %>% select(-c('applid', 'result', 'pubdate'))
+  dat <- dat %>% select(-c('applid', 'result'))
   cat(
     'Total rows: ',
     nrow(dat),
@@ -292,6 +292,7 @@ if (nrow(pmids_df) == 0) {
     "Title" = "title",
     "Year" = "year",
     "Program" = "program",
+    "description" = "abstract",
   )
 
   # Remove common, unallowed characters from entity name; includes hacky_cleaning
