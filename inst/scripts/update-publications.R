@@ -27,12 +27,11 @@ librarian::shelf(
   dplyr,
   readr,
   stringr,
-  reticulate,
   easyPubMed,
   synapser,
   httr,
   tidyr,
-  dplyr
+  lubridate
 )
 
 # nolint start
@@ -264,7 +263,7 @@ cat(
 # Includes some renaming and dropping of columns
 dat <- dat %>%
   group_by(pmid) %>%
-  mutate(grant = glue::glue_collapse(unique(.data$`grantNumber`), ", ")) %>%
+  mutate(grant = glue::glue_collapse(unique(.data$`grant`), ", ")) %>%
   mutate(consortium = glue::glue_collapse(unique(.data$program), ", ")) %>%
   select(!c(program)) %>%
   rename(
@@ -295,9 +294,6 @@ dat <- dat %>% rename(
 dat$entity_name <- remove_unacceptable_characters(dat$entity_name)
 
 ## ----fixing publicationDate format--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-library(lubridate)
-library(dplyr)
-
 dat <- dat %>%
   mutate(
     publicationDate_clean = case_when(
