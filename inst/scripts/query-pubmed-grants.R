@@ -11,14 +11,17 @@
 librarian::shelf(
   optparse,
   rmarkdown,
+  reticulate,
   janitor,
   dplyr,
   readr,
   stringr,
   easyPubMed,
+  synapser,
   comprehenr,
   httr,
   tidyr,
+  lubridate
 )
 
 # library('synapser')
@@ -65,9 +68,9 @@ source(glue::glue("{base_dir}/R/global-hard-coded-variables.R"))
 
 # Login to synapse
 ## Synapse client and logging in
-reticulate::use_condaenv("r-reticulate", required=TRUE)
 synapseclient <- reticulate::import("synapseclient")
-# syntab <- reticulate::import("synapseclient.table")
+syntab <- reticulate::import("synapseclient.table")
+
 syn <- synapseclient$Synapse()
 if (!is.na(opts$auth_token)) {
   syn$login(authToken = opts$auth_token)
@@ -96,10 +99,21 @@ hacky_cleaning <- function(text) {
 grants <-
   syn$tableQuery(glue::glue("SELECT grant, program, name FROM {sid_projects_table}"))$asDataFrame()
 
-# expand rows with multiple grants
-grants <- tidyr::unnest(grants, cols = grant)
+# convert grant numbers into string
+library(comprehenr)
+grantNumbers <-
+  to_list(for (g in grants$grant)
+    for (y in g)
+      y)
 
-grant_list <- grants$grant
+# expand rows with multiple grantNumbers
+grants$grant <-
+  purrr::map(grants$grant, function(x) {
+    paste(unlist(x), collapse = ",")
+  })
+
+grants <- grants %>%
+  separate_rows(grant)
 
 ## ----scrape pubmed ids from grant numbers---------------------------------------------------------------------------------------------------------------------------------------------
 get_pub_details <- function(request_body) {
@@ -135,7 +149,7 @@ headers <- list(accept = "application/json",
 
 # Set the request body
 request_body <- list(
-  criteria = list(core_project_nums = grant_list),
+  criteria = list(core_project_nums = grant),
   offset = 0,
   limit = 50,
   sort_field = "core_project_nums",
@@ -247,9 +261,30 @@ if (nrow(pmids_df) == 0) {
   dat$title <- hacky_cleaning(dat$title)
   dat$authors <- hacky_cleaning(dat$authors)
   dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
-  dat$abstract <- hacky_cleaning(dat$abstract)
   dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
 
+  # dat$abstract <- hacky_cleaning(dat$abstract)
+
+  # fix publication dates
+  dat <- dat %>%
+  mutate(
+    publicationDate_clean = case_when(
+      grepl("^\\d{4}$", publicationDate) ~ paste0("01 Jan ", publicationDate),
+      grepl("^[A-Za-z]{3} \\d{4}$", publicationDate) ~ paste0("01 ", publicationDate),
+      TRUE ~ publicationDate
+    ),
+    publicationDate_clean = parse_date_time(
+      publicationDate_clean,
+      orders = c("d b Y", "b Y", "Y", "Y-m-d")
+    ),
+    publicationDate_clean = format(publicationDate_clean, "%m/%d/%Y")
+  ) %>%
+  select(-publicationDate) %>%
+  rename(publicationDate = publicationDate_clean)
+
+dat <- dat %>%
+  mutate(publicationDate = format(as.Date(publicationDate, format = "%m/%d/%Y"), "%Y-%m-%d"))
+  
   # drop unnecessary columns
   dat <- dat %>% select(-c('applid', 'result'))
   cat(
@@ -292,11 +327,21 @@ if (nrow(pmids_df) == 0) {
     "Title" = "title",
     "Year" = "year",
     "Program" = "program",
-    "description" = "abstract",
   )
 
   # Remove common, unallowed characters from entity name; includes hacky_cleaning
   dat$entity_name <- remove_unacceptable_characters(dat$entity_name)
+
+  # add preprint annotation
+  dat <- dat %>%
+  mutate(
+    preprint = if_else(
+      str_detect(Journal, regex("rxiv", ignore_case = TRUE)) |
+        str_to_lower(Journal) == "research square",
+      "yes",
+      "no"
+    )
+  )
 
   ## ----columns--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   dat <- set_up_multiannotations(dat, "grant")
@@ -304,20 +349,39 @@ if (nrow(pmids_df) == 0) {
   dat <- set_up_multiannotations(dat, "Authors")
 
   ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  store_as_annotations <- function(parent, dat_list) {
-    entity <- purrr::map(
-      dat_list,
-      ~ synapseclient$File(
-        path = glue::glue("http://doi.org/{.$DOI}"),
-        name = .$entity_name,
+  store_as_annotations <- function(parent, list) {
+  purrr::map(
+    list,
+    function(x) {
+      file <- synapseclient$File(
+        path = glue::glue("http://doi.org/{x$DOI}"),
+        name = x$entity_name,
         parent = parent,
-        synapseStore = FALSE,
-        annotations = .
+        synapseStore = FALSE
       )
-    )
-    # entity
-    purrr::map(entity, ~ syn$store(., forceVersion = FALSE))
-  }
+      
+      file$annotations <- reticulate::dict(
+        Authors = x$Authors,
+        Journal = x$Journal,
+        PubmedId = x$PubmedId,
+        Title = x$Title,
+        Year = x$Year,
+        Grant = x$Grant,
+        Program = x$Program,
+        publicationDate = x$publicationDate,
+        DOI = x$DOI,
+        Name = x$Name,
+        preprint = x$preprint
+      )
+      
+      file$annotations[["__annotations__"]] <- reticulate::dict(
+        publicationDate = "DATE"
+      )
+      
+      syn$store(file, forceVersion = FALSE)
+    }
+  )
+}
 
   ## ----store, message=FALSE, echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------
   # parent = "syn51317180" # ELITE publications folder
