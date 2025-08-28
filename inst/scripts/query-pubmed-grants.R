@@ -100,7 +100,6 @@ grants <-
   syn$tableQuery(glue::glue("SELECT grant, program, name FROM {sid_projects_table}"))$asDataFrame()
 
 # convert grant numbers into string
-library(comprehenr)
 grantNumbers <-
   to_list(for (g in grants$grant)
     for (y in g)
