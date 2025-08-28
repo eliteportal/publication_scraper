@@ -148,7 +148,7 @@ headers <- list(accept = "application/json",
 
 # Set the request body
 request_body <- list(
-  criteria = list(core_project_nums = grant),
+  criteria = list(core_project_nums = grants$grant),
   offset = 0,
   limit = 50,
   sort_field = "core_project_nums",
