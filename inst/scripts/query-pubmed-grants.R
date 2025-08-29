@@ -278,8 +278,7 @@ if (nrow(pmids_df) == 0) {
   dat$authors <- hacky_cleaning(dat$authors)
   dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
   dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
-  dat$abstract = purrr::map(
-    dat$pmid, get_abstract)
+  dat$abstract = purrr::map(dat$pmid, get_abstract)
 
   # dat$abstract <- hacky_cleaning(dat$abstract)
 
