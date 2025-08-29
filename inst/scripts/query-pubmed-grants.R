@@ -21,7 +21,9 @@ librarian::shelf(
   comprehenr,
   httr,
   tidyr,
-  lubridate
+  lubridate,
+  XML,
+  rentrez
 )
 
 # library('synapser')
@@ -255,8 +257,6 @@ if (nrow(pmids_df) == 0) {
 
   # ---- get abstract function ----------------------------------------------------------------------------------------
     get_abstract <- function(pmid) {
-    library(XML)
-    library(rentrez)
     
     record <- rentrez::entrez_fetch(db = "pubmed", id = pmid, rettype = "xml", parsed = TRUE)
     
@@ -264,7 +264,6 @@ if (nrow(pmids_df) == 0) {
     
     if (length(abstract_nodes) > 0) {
       abstract_text <- abstract_nodes[[1]]
-      print(abstract_text)
       return(abstract_text)
     } else {
       print("No abstract found.")
