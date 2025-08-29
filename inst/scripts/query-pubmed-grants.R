@@ -257,7 +257,7 @@ if (nrow(pmids_df) == 0) {
 
   # ---- get abstract function ----------------------------------------------------------------------------------------
     get_abstract <- function(pmid) {
-    
+      # Function to get abstracts per pubmed id: https://stackoverflow.com/questions/77211966/r-how-to-extract-a-pubmed-abstract-using-rentrez
     record <- rentrez::entrez_fetch(db = "pubmed", id = pmid, rettype = "xml", parsed = TRUE)
     
     abstract_nodes <- XML::xpathSApply(record, "//AbstractText", XML::xmlValue)
