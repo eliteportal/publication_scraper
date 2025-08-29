@@ -21,7 +21,9 @@ librarian::shelf(
   comprehenr,
   httr,
   tidyr,
-  lubridate
+  lubridate,
+  XML,
+  rentrez
 )
 
 # library('synapser')
@@ -253,6 +255,21 @@ if (nrow(pmids_df) == 0) {
   # clean column names
   dat <- janitor::clean_names(dat, "lower_camel")
 
+  # ---- get abstract function ----------------------------------------------------------------------------------------
+    get_abstract <- function(pmid) {
+      # Function to get abstracts per pubmed id: https://stackoverflow.com/questions/77211966/r-how-to-extract-a-pubmed-abstract-using-rentrez
+    record <- rentrez::entrez_fetch(db = "pubmed", id = pmid, rettype = "xml", parsed = TRUE)
+    
+    abstract_nodes <- XML::xpathSApply(record, "//AbstractText", XML::xmlValue)
+    
+    if (length(abstract_nodes) > 0) {
+      abstract_text <- abstract_nodes[[1]]
+      return(abstract_text)
+    } else {
+      print("No abstract found.")
+    }
+  }
+  
   ## ----hacky----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   # Included in hacky_cleaning is conversion to ascii and removing html formatting
   dat$year <- stringr::str_extract(dat$pubdate, "\\d{4}")
@@ -261,6 +278,7 @@ if (nrow(pmids_df) == 0) {
   dat$authors <- hacky_cleaning(dat$authors)
   dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
   dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
+  dat$abstract = purrr::map(dat$pmid, get_abstract)
 
   # dat$abstract <- hacky_cleaning(dat$abstract)
 
@@ -378,6 +396,15 @@ dat <- dat %>%
       )
       
       syn$store(file, forceVersion = FALSE)
+      # make the wiki with abstract
+      if (!is.null(x$abstract) && nchar(x$abstract) > 0) {
+        wiki <- synapseclient$Wiki(
+          owner = entity$id,
+          markdown = x$abstract
+        )
+        syn$store(wiki)
+}
+      
     }
   )
 }
