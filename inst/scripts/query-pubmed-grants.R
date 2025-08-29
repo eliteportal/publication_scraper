@@ -398,11 +398,11 @@ dat <- dat %>%
       syn$store(file, forceVersion = FALSE)
       # make the wiki with abstract
       if (!is.null(x$abstract) && nchar(x$abstract) > 0) {
-       wiki <- synapseclient$Wiki(
-        owner = entity$id,
-        markdown = x$abstract
-  )
-  syn$store(wiki)
+        wiki <- synapseclient$Wiki(
+          owner = entity$id,
+          markdown = x$abstract
+        )
+        syn$store(wiki)
 }
       
     }
