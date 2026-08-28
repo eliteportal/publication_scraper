@@ -395,7 +395,7 @@ dat <- dat %>%
         publicationDate = "DATE"
       )
       
-      syn$store(file, forceVersion = FALSE)
+      entity <- syn$store(file, forceVersion = FALSE)
       # make the wiki with abstract
       if (!is.null(x$abstract) && nchar(x$abstract) > 0) {
         wiki <- synapseclient$Wiki(
