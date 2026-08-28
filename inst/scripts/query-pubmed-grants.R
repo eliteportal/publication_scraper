@@ -121,7 +121,7 @@ tryCatch({
 # expired, revoked, or scoped without `modify` can fail here rather than at login.
 profile <- tryCatch({
   p <- syn$getUserProfile()
-  log_step("Authenticated as userName=", "<REDACTED>", " ownerId=", p$ownerId)
+  log_step("Authenticated!")
   p
 }, error = function(e) {
   log_step("getUserProfile FAILED (not actually authenticated): ", conditionMessage(e))
