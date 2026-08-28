@@ -17,6 +17,7 @@ Sage portals require content management of publications, people, data, studies a
 * [Troubleshooting](#troubleshooting)
   * [PubMed Abstract Retrieval Failures](#pubmed-abstract-retrieval-failures)
   * [Publications Folder / File View Not Updated](#publications-folder--file-view-not-updated)
+  * [Synapse Authentication Failure](#synapse-authentication-failure)
 
 ## Installation instructions
 
@@ -92,3 +93,22 @@ If the publications folder and subsequent file view monitoring have not been upd
 GitHub automatically disables scheduled workflows in public repositories after 60 days of repository inactivity. Check the [Actions tab](https://github.com/eliteportal/publication_scraper/actions) to confirm that the [`updated-publications.yaml` workflow](https://github.com/eliteportal/publication_scraper/actions/workflows/update-publications.yaml) is enabled.
 
 If it has been disabled (there will be a note specifying it has been disabled with an option to enable), manually re-enable it and then [run the workflow](#run-manually-with-github-actions).
+
+### Synapse Authentication Failure
+
+If the workflow fails with the following error:
+
+```text
+Error: synapseclient.core.exceptions.SynapseAuthenticationError:
+You are not logged in and do not have access to a requested resource
+```
+
+the `SYNAPSE_PAT` GitHub secret may have expired, been revoked, or otherwise become invalid.
+
+The workflow authenticates to Synapse using a Personal Access Token (PAT) associated with the DPE Synapse service user. If the token is no longer valid (there is a 180-day inactivity expiration policy with Synapse PATs), log in to Synapse using the DPE service user account and create a new [Personal Access Token](https://docs.synapse.org/synapse-docs/managing-your-account#Personal-Access-Tokens-(PATs)).
+
+After creating the new token:
+
+1. Update the repository's `SYNAPSE_PAT` [GitHub Actions repository secret](https://github.com/eliteportal/publication_scraper/settings/secrets/actions) with the new token.
+2. Manually run the workflow using [GitHub Actions](#run-manually-with-github-actions).
+3. Confirm that the workflow can successfully authenticate to Synapse and complete the publication update.
