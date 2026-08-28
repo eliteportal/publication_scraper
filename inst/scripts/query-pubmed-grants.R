@@ -67,17 +67,6 @@ log_step <- function(...) {
   message(sprintf("[%s] %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), paste0(..., collapse = "")))
 }
 
-# Wrap any Synapse call so the label and synID are reported on failure.
-syn_try <- function(label, synid, expr) {
-  log_step("START ", label, " [", synid, "]")
-  out <- tryCatch(expr, error = function(e) {
-    log_step("FAILED ", label, " [", synid, "]: ", conditionMessage(e))
-    stop(e)
-  })
-  log_step("OK    ", label, " [", synid, "]")
-  out
-}
-
 # get the base working directory to make it work on others systems
 base_dir <- gsub('vignettes', '', getwd())
 source(glue::glue("{base_dir}/R/pubmed.R"))
@@ -127,19 +116,6 @@ profile <- tryCatch({
   log_step("getUserProfile FAILED (not actually authenticated): ", conditionMessage(e))
   stop(e)
 })
-
-# Pre-flight the write target so a permissions problem surfaces now instead of
-# after the PubMed queries, which take a long time.
-pub_folder <- syn_try("get target publication folder", sid_pub_folder,
-                      syn$get(sid_pub_folder, downloadFile = FALSE))
-log_step("Target folder: name=", pub_folder$name, " parentId=", pub_folder$parentId)
-
-folder_perms <- syn_try("get permissions on target folder", sid_pub_folder,
-                        syn$getPermissions(sid_pub_folder, profile$ownerId))
-log_step("Permissions: ", paste(unlist(folder_perms), collapse = ", "))
-if (!("CREATE" %in% unlist(folder_perms))) {
-  stop(glue::glue("No CREATE permission on {sid_pub_folder}; entities cannot be stored."))
-}
 
 ## ----functions------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 hacky_cleaning <- function(text) {
