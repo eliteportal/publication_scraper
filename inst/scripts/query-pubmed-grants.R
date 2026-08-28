@@ -317,18 +317,84 @@ if (nrow(pmids_df) == 0) {
   dat <- janitor::clean_names(dat, "lower_camel")
 
   # ---- get abstract function ----------------------------------------------------------------------------------------
-    get_abstract <- function(pmid) {
-      # Function to get abstracts per pubmed id: https://stackoverflow.com/questions/77211966/r-how-to-extract-a-pubmed-abstract-using-rentrez
-    record <- rentrez::entrez_fetch(db = "pubmed", id = pmid, rettype = "xml", parsed = TRUE)
-    
-    abstract_nodes <- XML::xpathSApply(record, "//AbstractText", XML::xmlValue)
-    
-    if (length(abstract_nodes) > 0) {
-      abstract_text <- abstract_nodes[[1]]
-      return(abstract_text)
-    } else {
-      print("No abstract found.")
+  #' Fetch a PubMed Abstract
+  #'
+  #' Fetches the abstract associated with a PubMed ID (PMID) using the
+  #' NCBI Entrez API. The request is retried when an HTTP or other
+  #' request error occurs with 15 and 30 seconds between retries 
+  #' (depending on the number of attempts)
+  #'
+  #' @param pmid A PubMed ID
+  #'
+  #' @return The abstract as a character string. Returns NULL
+  #'   if no abstract is available or the PubMed record cannot be retrieved.
+  #'
+  #' @examples
+  #' get_abstract("12345678")
+  #'
+  #' @export
+  get_abstract <- function(pmid, max_attempts = 3) {
+    # Function to get abstracts per PubMed ID:
+    # https://stackoverflow.com/questions/77211966/r-how-to-extract-a-pubmed-abstract-using-rentrez
+
+    retry_wait <- c(15, 30)
+
+    record <- NULL
+
+    for (attempt in seq_len(max_attempts)) {
+      record <- tryCatch(
+        {
+          rentrez::entrez_fetch(
+            db = "pubmed",
+            id = pmid,
+            rettype = "xml",
+            parsed = TRUE
+          )
+        },
+        error = function(e) {
+          message(
+            "entrez_fetch failed for PMID ", pmid,
+            " (attempt ", attempt, "/", max_attempts, "): ",
+            conditionMessage(e)
+          )
+          NULL
+        }
+      )
+
+      # Successful request
+      if (!is.null(record)) {
+        break
+      }
+
+      # Don't sleep after the final attempt
+      if (attempt < max_attempts) {
+        wait <- retry_wait[attempt]
+        message("Retrying in ", wait, " seconds...")
+        Sys.sleep(wait)
+      }
     }
+
+    # All attempts failed
+    if (is.null(record)) {
+      warning(
+        "Failed to fetch PMID ", pmid,
+        " after ", max_attempts, " attempts."
+      )
+      return(NULL)
+    }
+
+    abstract_nodes <- XML::xpathSApply(
+      record,
+      "//AbstractText",
+      XML::xmlValue
+    )
+
+    if (length(abstract_nodes) > 0) {
+      return(abstract_nodes[[1]])
+    }
+
+    message("No abstract found for PMID ", pmid)
+    return(NULL)
   }
   
   ## ----hacky----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
