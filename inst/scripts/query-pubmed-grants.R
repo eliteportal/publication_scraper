@@ -61,6 +61,23 @@ option_list <- list(
 )
 opts <- parse_args(OptionParser(option_list = option_list))
 
+## ----logging--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Timestamped checkpoints so a failure in CI can be traced to a specific call.
+log_step <- function(...) {
+  message(sprintf("[%s] %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), paste0(..., collapse = "")))
+}
+
+# Wrap any Synapse call so the label and synID are reported on failure.
+syn_try <- function(label, synid, expr) {
+  log_step("START ", label, " [", synid, "]")
+  out <- tryCatch(expr, error = function(e) {
+    log_step("FAILED ", label, " [", synid, "]: ", conditionMessage(e))
+    stop(e)
+  })
+  log_step("OK    ", label, " [", synid, "]")
+  out
+}
+
 # get the base working directory to make it work on others systems
 base_dir <- gsub('vignettes', '', getwd())
 source(glue::glue("{base_dir}/R/pubmed.R"))
@@ -70,14 +87,58 @@ source(glue::glue("{base_dir}/R/global-hard-coded-variables.R"))
 
 # Login to synapse
 ## Synapse client and logging in
+log_step("Importing synapseclient via reticulate")
 synapseclient <- reticulate::import("synapseclient")
 syntab <- reticulate::import("synapseclient.table")
+log_step("synapseclient version: ", synapseclient$`__version__`)
+log_step("python: ", reticulate::py_config()$python)
 
 syn <- synapseclient$Synapse()
-if (!is.na(opts$auth_token)) {
-  syn$login(authToken = opts$auth_token)
-} else {
-  syn$login()
+
+# Report which credential sources are available, without ever printing the secret.
+token_arg <- opts$auth_token
+token_env <- Sys.getenv("SYNAPSE_AUTH_TOKEN", unset = "")
+has_arg <- !is.na(token_arg) && nzchar(token_arg)
+log_step("--auth_token supplied: ", has_arg,
+         " (nchar=", if (is.na(token_arg)) 0 else nchar(token_arg), ")")
+log_step("SYNAPSE_AUTH_TOKEN env set: ", nzchar(token_env), " (nchar=", nchar(token_env), ")")
+log_step("~/.synapseConfig present: ", file.exists(path.expand("~/.synapseConfig")))
+
+tryCatch({
+  if (has_arg) {
+    log_step("Attempting login with --auth_token")
+    syn$login(authToken = token_arg)
+  } else {
+    log_step("Attempting login with SYNAPSE_AUTH_TOKEN / .synapseConfig")
+    syn$login()
+  }
+}, error = function(e) {
+  log_step("LOGIN FAILED: ", conditionMessage(e))
+  stop(e)
+})
+
+# Confirm the session is really authenticated before doing any work. A PAT that is
+# expired, revoked, or scoped without `modify` can fail here rather than at login.
+profile <- tryCatch({
+  p <- syn$getUserProfile()
+  log_step("Authenticated as userName=", "<REDACTED>", " ownerId=", p$ownerId)
+  p
+}, error = function(e) {
+  log_step("getUserProfile FAILED (not actually authenticated): ", conditionMessage(e))
+  stop(e)
+})
+
+# Pre-flight the write target so a permissions problem surfaces now instead of
+# after the PubMed queries, which take a long time.
+pub_folder <- syn_try("get target publication folder", sid_pub_folder,
+                      syn$get(sid_pub_folder, downloadFile = FALSE))
+log_step("Target folder: name=", pub_folder$name, " parentId=", pub_folder$parentId)
+
+folder_perms <- syn_try("get permissions on target folder", sid_pub_folder,
+                        syn$getPermissions(sid_pub_folder, profile$ownerId))
+log_step("Permissions: ", paste(unlist(folder_perms), collapse = ", "))
+if (!("CREATE" %in% unlist(folder_perms))) {
+  stop(glue::glue("No CREATE permission on {sid_pub_folder}; entities cannot be stored."))
 }
 
 ## ----functions------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -99,7 +160,8 @@ hacky_cleaning <- function(text) {
 
 # Gather list of grants from synapse
 grants <-
-  syn$tableQuery(glue::glue("SELECT grant, program, name FROM {sid_projects_table}"))$asDataFrame()
+  syn_try("query projects table", sid_projects_table,
+          syn$tableQuery(glue::glue("SELECT grant, program, name FROM {sid_projects_table}"))$asDataFrame())
 
 # convert grant numbers into string
 grantNumbers <-
