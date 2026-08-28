@@ -18,6 +18,7 @@ Sage portals require content management of publications, people, data, studies a
   * [PubMed Abstract Retrieval Failures](#pubmed-abstract-retrieval-failures)
   * [Publications Folder / File View Not Updated](#publications-folder--file-view-not-updated)
   * [Synapse Authentication Failure](#synapse-authentication-failure)
+  * [Workflow Stalling](#workflow-stalling)
 
 ## Installation instructions
 
@@ -112,3 +113,16 @@ After creating the new token:
 1. Update the repository's `SYNAPSE_PAT` [GitHub Actions repository secret](https://github.com/eliteportal/publication_scraper/settings/secrets/actions) with the new token.
 2. Manually run the workflow using [GitHub Actions](#run-manually-with-github-actions).
 3. Confirm that the workflow can successfully authenticate to Synapse and complete the publication update.
+
+### Workflow Stalling
+
+If the workflow appears to stall without producing additional output , check the Actions logs to determine the last step or message that completed.
+
+The workflow may occasionally appear to stall while communicating with an external service, particularly during:
+
+* Synapse authentication (`syn$login()`)
+* PubMed metadata retrieval (`pub_query()`)
+
+If the workflow stalls during Synapse login, would cancel the stalled workflow, wait a few minutes, and then [manually run the workflow again](#run-manually-with-github-actions).
+
+If the workflow stalls during retrieving the publications externally (e.g: `pub_query()`), the issue may be related to a temporary PubMed/NCBI service or network issue. You could continued to wait (it may take up to 30 minutes or longer) or cancel the stalled workflow, wait a few minutes, and then [manually run the workflow again](#run-manually-with-github-actions).
