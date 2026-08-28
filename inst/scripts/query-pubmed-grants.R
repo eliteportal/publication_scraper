@@ -427,9 +427,9 @@ dat <- dat %>%
   dat <- set_up_multiannotations(dat, "Authors")
 
   ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  store_as_annotations <- function(parent, list) {
+  store_as_annotations <- function(parent, dat_list) {
   purrr::map(
-    list,
+    dat_list,
     function(x) {
       file <- synapseclient$File(
         path = glue::glue("http://doi.org/{x$DOI}"),
