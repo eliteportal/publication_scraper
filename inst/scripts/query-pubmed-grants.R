@@ -160,8 +160,7 @@ hacky_cleaning <- function(text) {
 
 # Gather list of grants from synapse
 grants <-
-  syn_try("query projects table", sid_projects_table,
-          syn$tableQuery(glue::glue("SELECT grant, program, name FROM {sid_projects_table}"))$asDataFrame())
+  syn$tableQuery(glue::glue("SELECT grant, program, name FROM {sid_projects_table}"))$asDataFrame()
 
 # convert grant numbers into string
 grantNumbers <-
