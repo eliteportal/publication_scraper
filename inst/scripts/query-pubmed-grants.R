@@ -398,6 +398,11 @@ if (nrow(pmids_df) == 0) {
   dat$title <- hacky_cleaning(dat$title)
   dat$authors <- hacky_cleaning(dat$authors)
   dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
+  log_step("Raw pubdate values before publicationDate extraction:")
+  print(
+    dat %>%
+      select(pmid, pubdate)
+  )
   dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
   log_publication_dates(dat, "after str_extract")
   dat$abstract = purrr::map(dat$pmid, get_abstract)
