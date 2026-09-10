@@ -403,7 +403,31 @@ if (nrow(pmids_df) == 0) {
     dat %>%
       select(pmid, pubdate)
   )
-  dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
+  #dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
+  dat <- dat %>%
+    mutate(
+      publicationDate = parse_date_time(
+        pubdate,
+        orders = c(
+          "Y b d",  # 2025 Dec 19
+          "Y b",    # 2022 Sep
+          "Y"       # 2022
+        )
+      ),
+      publicationDate = format(publicationDate, "%Y-%m-%d")
+    )
+  failed_dates <- dat %>%
+    filter(is.na(publicationDate)) %>%
+    select(pmid, pubdate)
+
+  if (nrow(failed_dates) > 0) {
+    log_step(
+      "WARNING: Failed to parse ",
+      nrow(failed_dates),
+      " publication dates:"
+    )
+    print(failed_dates)
+  }
   log_publication_dates(dat, "after str_extract")
   dat$abstract = purrr::map(dat$pmid, get_abstract)
 
