@@ -82,6 +82,24 @@ syntab <- reticulate::import("synapseclient.table")
 log_step("synapseclient version: ", synapseclient$`__version__`)
 log_step("python: ", reticulate::py_config()$python)
 
+log_publication_dates <- function(dat, stage) {
+  log_step(
+    "[publicationDate] ", stage,
+    ": rows=", nrow(dat),
+    ", NA=", sum(is.na(dat$publicationDate)),
+    ", non-NA=", sum(!is.na(dat$publicationDate))
+  )
+
+  bad <- dat %>%
+    filter(is.na(publicationDate)) %>%
+    select(any_of(c("pmid", "pubdate", "publicationDate")))
+
+  if (nrow(bad) > 0) {
+    log_step("[publicationDate] Rows with NA at ", stage, ":")
+    print(bad)
+  }
+}
+
 syn <- synapseclient$Synapse()
 
 # Report which credential sources are available, without ever printing the secret.
@@ -381,6 +399,7 @@ if (nrow(pmids_df) == 0) {
   dat$authors <- hacky_cleaning(dat$authors)
   dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
   dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
+  log_publication_dates(dat, "after str_extract")
   dat$abstract = purrr::map(dat$pmid, get_abstract)
 
   # dat$abstract <- hacky_cleaning(dat$abstract)
@@ -402,8 +421,11 @@ if (nrow(pmids_df) == 0) {
   select(-publicationDate) %>%
   rename(publicationDate = publicationDate_clean)
 
+  log_publication_dates(dat, "after parse_date_time + format")
+
 dat <- dat %>%
-  mutate(publicationDate = format(as.Date(publicationDate, format = "%m/%d/%Y"), "%Y-%m-%d"))
+  mutate(publicationDate = format(as.Date(publicationDate, format = "%m/%d/%Y"), "%Y-%m-%d")) %>%
+  log_publication_dates(dat, "after final format")
   
   # drop unnecessary columns
   dat <- dat %>% select(-c('applid', 'result'))
@@ -493,11 +515,18 @@ dat <- dat %>%
         Name = x$Name,
         preprint = x$preprint
       )
-      
+      log_step(
+        "Storing PMID=", x$PubmedId,
+        " publicationDate=",
+        if (is.null(x$publicationDate) || is.na(x$publicationDate)) {
+          "<NA>"
+        } else {
+          x$publicationDate
+        }
+      )
       file$annotations[["__annotations__"]] <- reticulate::dict(
         publicationDate = "DATE"
       )
-      
       entity <- syn$store(file, forceVersion = FALSE)
       # make the wiki with abstract
       if (!is.null(x$abstract) && nchar(x$abstract) > 0) {
