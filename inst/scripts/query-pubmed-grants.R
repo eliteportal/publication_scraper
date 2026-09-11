@@ -453,8 +453,7 @@ if (nrow(pmids_df) == 0) {
   #log_publication_dates(dat, "after parse_date_time + format")
 
 dat <- dat %>%
-  mutate(publicationDate = format(as.Date(publicationDate, format = "%m/%d/%Y"), "%Y-%m-%d")) %>%
-  #log_publication_dates(dat, "after final format")
+  mutate(publicationDate = format(as.Date(publicationDate, format = "%m/%d/%Y"), "%Y-%m-%d"))
   
   # drop unnecessary columns
   dat <- dat %>% select(-c('applid', 'result'))
