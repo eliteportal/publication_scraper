@@ -428,7 +428,7 @@ if (nrow(pmids_df) == 0) {
     )
     print(failed_dates)
   }
-  log_publication_dates(dat, "after str_extract")
+  #log_publication_dates(dat, "after str_extract")
   dat$abstract = purrr::map(dat$pmid, get_abstract)
 
   # dat$abstract <- hacky_cleaning(dat$abstract)
@@ -450,11 +450,11 @@ if (nrow(pmids_df) == 0) {
   select(-publicationDate) %>%
   rename(publicationDate = publicationDate_clean)
 
-  log_publication_dates(dat, "after parse_date_time + format")
+  #log_publication_dates(dat, "after parse_date_time + format")
 
 dat <- dat %>%
   mutate(publicationDate = format(as.Date(publicationDate, format = "%m/%d/%Y"), "%Y-%m-%d")) %>%
-  log_publication_dates(dat, "after final format")
+  #log_publication_dates(dat, "after final format")
   
   # drop unnecessary columns
   dat <- dat %>% select(-c('applid', 'result'))
