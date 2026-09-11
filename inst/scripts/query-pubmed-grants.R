@@ -490,6 +490,41 @@ dat <- dat %>%
   )
 
   ## ----columns--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  log_step("Before set_up_multiannotations(grant):")
+
+  print(
+    dat %>%
+      select(PubmedId, grant) %>%
+      head(20)
+  )
+
+  log_step(
+    "grant missing before transform: ",
+    sum(is.na(dat$grant)),
+    " / ",
+    nrow(dat)
+  )
+
+  log_step("After set_up_multiannotations(grant):")
+
+  print(names(dat))
+
+  if ("Grant" %in% names(dat)) {
+    print(
+      dat %>%
+        select(PubmedId, Grant) %>%
+        head(20)
+    )
+
+    log_step(
+      "Grant missing after transform: ",
+      sum(is.na(dat$Grant)),
+      " / ",
+      nrow(dat)
+    )
+  } else {
+    log_step("WARNING: Grant column does not exist after set_up_multiannotations")
+  }
   dat <- set_up_multiannotations(dat, "grant")
   dat <- set_up_multiannotations(dat, "Program")
   dat <- set_up_multiannotations(dat, "Authors")
