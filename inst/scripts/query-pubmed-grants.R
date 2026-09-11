@@ -547,7 +547,7 @@ dat <- dat %>%
         PubmedId = x$PubmedId,
         Title = x$Title,
         Year = x$Year,
-        Grant = x$Grant,
+        Grant = x$grant,
         Program = x$Program,
         publicationDate = x$publicationDate,
         DOI = x$DOI,
@@ -574,12 +574,6 @@ dat <- dat %>%
   ## ----store, message=FALSE, echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------
   # parent = "syn51317180" # ELITE publications folder
   dat_list <- purrr::transpose(dat)
-
-  #rename grant column to Grant for consistency with annotations
-  dat <- dat %>%
-    rename(
-      Grant = grant
-    )
   # another eternity
   store_as_annotations(parent = sid_pub_folder, dat_list=dat_list)
 }
