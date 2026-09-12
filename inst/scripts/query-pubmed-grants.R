@@ -185,22 +185,15 @@ validate_annotations <- function(dat, annotation_columns) {
       )
     }
 
-    if (n_missing > 0) {
-      warning(
-        glue::glue(
-          "Annotation '{col}' is missing for ",
-          "{n_missing}/{n_total} publications."
-        )
-      )
-    } else {
-      log_step(
-        "Annotation validation: ",
-        col,
-        " - OK (0/",
-        n_total,
-        " missing)"
-      )
-    }
+    log_step(
+      "Annotation validation: ",
+      col,
+      " - ",
+      n_missing,
+      "/",
+      n_total,
+      " missing"
+    )
   }
 
   log_step("All annotation validation checks passed.")
