@@ -130,6 +130,83 @@ hacky_cleaning <- function(text) {
   return(conv)
 }
 
+#' Validate Publication Annotations
+#'
+#' Validates expected annotation columns in a publication data frame before
+#' storing publication entities in Synapse. The function checks that each
+#' expected annotation column exists and contains at least one non-missing
+#' value. Missing values include NA, empty strings, "NA", "None", and "NaN".
+#'
+#' The function stops execution if an expected column is missing or if an
+#' annotation is missing for all publications. A warning is issued when an
+#' annotation is missing for only some publications.
+#'
+#' @param dat A data frame containing publication metadata and annotations.
+#' @param annotation_columns A character vector containing the names of
+#'   annotation columns to validate.
+#'
+#' @return Invisibly returns TRUE when validation succeeds. Stops execution
+#'   if a required annotation column is absent or entirely missing.
+#'
+#' @examples
+#' validate_annotations(
+#'   dat,
+#'   c("Authors", "Journal", "Grant", "Program", "publicationDate")
+#' )
+#'
+#' @export
+validate_annotations <- function(dat, annotation_columns) {
+  for (col in annotation_columns) {
+
+    # Make sure the expected column exists
+    if (!col %in% names(dat)) {
+      stop(
+        glue::glue(
+          "VALIDATION FAILED: expected annotation column '{col}' does not exist."
+        )
+      )
+    }
+
+    values <- dat[[col]]
+
+    # Treat NA and empty-ish values as missing
+    missing <- is.na(values) |
+      trimws(as.character(values)) %in% c("", "NA", "None", "NaN")
+
+    n_missing <- sum(missing)
+    n_total <- length(missing)
+
+    if (n_missing == n_total) {
+      stop(
+        glue::glue(
+          "VALIDATION FAILED: annotation '{col}' is missing for ALL ",
+          "{n_total} publications. Aborting Synapse upload."
+        )
+      )
+    }
+
+    if (n_missing > 0) {
+      warning(
+        glue::glue(
+          "Annotation '{col}' is missing for ",
+          "{n_missing}/{n_total} publications."
+        )
+      )
+    } else {
+      log_step(
+        "Annotation validation: ",
+        col,
+        " - OK (0/",
+        n_total,
+        " missing)"
+      )
+    }
+  }
+
+  log_step("All annotation validation checks passed.")
+
+  invisible(TRUE)
+}
 
 ## ----vars, echo=FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------------
 # table_id <- "syn51209786" # ELITE Portal Projects Table
@@ -490,41 +567,6 @@ dat <- dat %>%
   )
 
   ## ----columns--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  log_step("Before set_up_multiannotations(grant):")
-
-  print(
-    dat %>%
-      select(PubmedId, grant) %>%
-      head(20)
-  )
-
-  log_step(
-    "grant missing before transform: ",
-    sum(is.na(dat$grant)),
-    " / ",
-    nrow(dat)
-  )
-
-  log_step("After set_up_multiannotations(grant):")
-
-  print(names(dat))
-
-  if ("Grant" %in% names(dat)) {
-    print(
-      dat %>%
-        select(PubmedId, Grant) %>%
-        head(20)
-    )
-
-    log_step(
-      "Grant missing after transform: ",
-      sum(is.na(dat$Grant)),
-      " / ",
-      nrow(dat)
-    )
-  } else {
-    log_step("WARNING: Grant column does not exist after set_up_multiannotations")
-  }
   dat <- set_up_multiannotations(dat, "grant")
   dat <- set_up_multiannotations(dat, "Program")
   dat <- set_up_multiannotations(dat, "Authors")
@@ -570,7 +612,25 @@ dat <- dat %>%
     }
   )
 }
+  # Define the expected annotation columns for validation
+  annotation_columns <- c(
+    "Authors",
+    "Journal",
+    "PubmedId",
+    "Title",
+    "Year",
+    "grant",
+    "Program",
+    "publicationDate",
+    "DOI",
+    "Name",
+    "preprint"
+  )
 
+  validate_annotations(
+    dat = dat,
+    annotation_columns = annotation_columns
+  )
   ## ----store, message=FALSE, echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------
   # parent = "syn51317180" # ELITE publications folder
   dat_list <- purrr::transpose(dat)
