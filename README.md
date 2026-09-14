@@ -91,16 +91,6 @@ Important notes about the GitHub Action:
 * GitHub automatically disables scheduled workflows in public repositories after 60 days of repository inactivity. See [Publications Folder / File View Not Updated](#publications-folder--file-view-not-updated) for troubleshooting.
 * Review the **Query PubMed and upload results** step in the Actions run to determine whether publications were updated. If there are no new PMIDs to add, the output will include `[1] "All pmids already in the portal"`.
 
-
-## Automation
-
-The [`updated-publications.yaml`](.github/workflows/updated-publications.yaml) GitHub Actions workflow runs the publication update automatically on a monthly schedule. The workflow runs the same publication query described above using the Synapse service user `synapse-service-dpe-team`.
-
-Important notes about the GitHub Action:
-
-* GitHub automatically disables scheduled workflows in public repositories after 60 days of repository inactivity. See [Publications Folder / File View Not Updated](#publications-folder--file-view-not-updated) for troubleshooting.
-* Review the **Query PubMed and upload results** step in the Actions run to determine whether publications were updated. If there are no new PMIDs to add, the output will include `[1] "All pmids already in the portal"`.
-
 ## Updates
 
 **2023-10-10**
