@@ -61,6 +61,12 @@ option_list <- list(
 )
 opts <- parse_args(OptionParser(option_list = option_list))
 
+## ----logging--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Timestamped checkpoints so a failure in CI can be traced to a specific call.
+log_step <- function(...) {
+  message(sprintf("[%s] %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), paste0(..., collapse = "")))
+}
+
 # get the base working directory to make it work on others systems
 base_dir <- gsub('vignettes', '', getwd())
 source(glue::glue("{base_dir}/R/pubmed.R"))
@@ -70,15 +76,46 @@ source(glue::glue("{base_dir}/R/global-hard-coded-variables.R"))
 
 # Login to synapse
 ## Synapse client and logging in
+log_step("Importing synapseclient via reticulate")
 synapseclient <- reticulate::import("synapseclient")
 syntab <- reticulate::import("synapseclient.table")
+log_step("synapseclient version: ", synapseclient$`__version__`)
+log_step("python: ", reticulate::py_config()$python)
 
 syn <- synapseclient$Synapse()
-if (!is.na(opts$auth_token)) {
-  syn$login(authToken = opts$auth_token)
-} else {
-  syn$login()
-}
+
+# Report which credential sources are available, without ever printing the secret.
+token_arg <- opts$auth_token
+token_env <- Sys.getenv("SYNAPSE_AUTH_TOKEN", unset = "")
+has_arg <- !is.na(token_arg) && nzchar(token_arg)
+log_step("--auth_token supplied: ", has_arg,
+         " (nchar=", if (is.na(token_arg)) 0 else nchar(token_arg), ")")
+log_step("SYNAPSE_AUTH_TOKEN env set: ", nzchar(token_env), " (nchar=", nchar(token_env), ")")
+log_step("~/.synapseConfig present: ", file.exists(path.expand("~/.synapseConfig")))
+
+tryCatch({
+  if (has_arg) {
+    log_step("Attempting login with --auth_token")
+    syn$login(authToken = token_arg)
+  } else {
+    log_step("Attempting login with SYNAPSE_AUTH_TOKEN / .synapseConfig")
+    syn$login()
+  }
+}, error = function(e) {
+  log_step("LOGIN FAILED: ", conditionMessage(e))
+  stop(e)
+})
+
+# Confirm the session is really authenticated before doing any work. A PAT that is
+# expired, revoked, or scoped without `modify` can fail here rather than at login.
+profile <- tryCatch({
+  p <- syn$getUserProfile()
+  log_step("Authenticated!")
+  p
+}, error = function(e) {
+  log_step("getUserProfile FAILED (not actually authenticated): ", conditionMessage(e))
+  stop(e)
+})
 
 ## ----functions------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 hacky_cleaning <- function(text) {
@@ -93,6 +130,76 @@ hacky_cleaning <- function(text) {
   return(conv)
 }
 
+#' Validate Publication Annotations
+#'
+#' Validates expected annotation columns in a publication data frame before
+#' storing publication entities in Synapse. The function checks that each
+#' expected annotation column exists and contains at least one non-missing
+#' value. Missing values include NA, empty strings, "NA", "None", and "NaN".
+#'
+#' The function stops execution if an expected column is missing or if an
+#' annotation is missing for all publications. A warning is issued when an
+#' annotation is missing for only some publications.
+#'
+#' @param dat A data frame containing publication metadata and annotations.
+#' @param annotation_columns A character vector containing the names of
+#'   annotation columns to validate.
+#'
+#' @return Invisibly returns TRUE when validation succeeds. Stops execution
+#'   if a required annotation column is absent or entirely missing.
+#'
+#' @examples
+#' validate_annotations(
+#'   dat,
+#'   c("Authors", "Journal", "Grant", "Program", "publicationDate")
+#' )
+#'
+#' @export
+validate_annotations <- function(dat, annotation_columns) {
+  for (col in annotation_columns) {
+
+    # Make sure the expected column exists
+    if (!col %in% names(dat)) {
+      stop(
+        glue::glue(
+          "VALIDATION FAILED: expected annotation column '{col}' does not exist."
+        )
+      )
+    }
+
+    values <- dat[[col]]
+
+    # Treat NA and empty-ish values as missing
+    missing <- is.na(values) |
+      trimws(as.character(values)) %in% c("", "NA", "None", "NaN")
+
+    n_missing <- sum(missing)
+    n_total <- length(missing)
+
+    if (n_missing == n_total) {
+      stop(
+        glue::glue(
+          "VALIDATION FAILED: annotation '{col}' is missing for ALL ",
+          "{n_total} publications. Aborting Synapse upload."
+        )
+      )
+    }
+
+    log_step(
+      "Annotation validation: ",
+      col,
+      " - ",
+      n_missing,
+      "/",
+      n_total,
+      " missing"
+    )
+  }
+
+  log_step("All annotation validation checks passed.")
+
+  invisible(TRUE)
+}
 
 ## ----vars, echo=FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------------
 # table_id <- "syn51209786" # ELITE Portal Projects Table
@@ -256,18 +363,84 @@ if (nrow(pmids_df) == 0) {
   dat <- janitor::clean_names(dat, "lower_camel")
 
   # ---- get abstract function ----------------------------------------------------------------------------------------
-    get_abstract <- function(pmid) {
-      # Function to get abstracts per pubmed id: https://stackoverflow.com/questions/77211966/r-how-to-extract-a-pubmed-abstract-using-rentrez
-    record <- rentrez::entrez_fetch(db = "pubmed", id = pmid, rettype = "xml", parsed = TRUE)
-    
-    abstract_nodes <- XML::xpathSApply(record, "//AbstractText", XML::xmlValue)
-    
-    if (length(abstract_nodes) > 0) {
-      abstract_text <- abstract_nodes[[1]]
-      return(abstract_text)
-    } else {
-      print("No abstract found.")
+  #' Fetch a PubMed Abstract
+  #'
+  #' Fetches the abstract associated with a PubMed ID (PMID) using the
+  #' NCBI Entrez API. The request is retried when an HTTP or other
+  #' request error occurs with 15 and 30 seconds between retries 
+  #' (depending on the number of attempts)
+  #'
+  #' @param pmid A PubMed ID
+  #'
+  #' @return The abstract as a character string. Returns NULL
+  #'   if no abstract is available or the PubMed record cannot be retrieved.
+  #'
+  #' @examples
+  #' get_abstract("12345678")
+  #'
+  #' @export
+  get_abstract <- function(pmid, max_attempts = 3) {
+    # Function to get abstracts per PubMed ID:
+    # https://stackoverflow.com/questions/77211966/r-how-to-extract-a-pubmed-abstract-using-rentrez
+
+    retry_wait <- c(15, 30)
+
+    record <- NULL
+
+    for (attempt in seq_len(max_attempts)) {
+      record <- tryCatch(
+        {
+          rentrez::entrez_fetch(
+            db = "pubmed",
+            id = pmid,
+            rettype = "xml",
+            parsed = TRUE
+          )
+        },
+        error = function(e) {
+          message(
+            "entrez_fetch failed for PMID ", pmid,
+            " (attempt ", attempt, "/", max_attempts, "): ",
+            conditionMessage(e)
+          )
+          NULL
+        }
+      )
+
+      # Successful request
+      if (!is.null(record)) {
+        break
+      }
+
+      # Don't sleep after the final attempt
+      if (attempt < max_attempts) {
+        wait <- retry_wait[attempt]
+        message("Retrying in ", wait, " seconds...")
+        Sys.sleep(wait)
+      }
     }
+
+    # All attempts failed
+    if (is.null(record)) {
+      warning(
+        "Failed to fetch PMID ", pmid,
+        " after ", max_attempts, " attempts."
+      )
+      return(NULL)
+    }
+
+    abstract_nodes <- XML::xpathSApply(
+      record,
+      "//AbstractText",
+      XML::xmlValue
+    )
+
+    if (length(abstract_nodes) > 0) {
+      return(abstract_nodes[[1]])
+    }
+
+    message("No abstract found for PMID ", pmid)
+    return(NULL)
   }
   
   ## ----hacky----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -277,7 +450,33 @@ if (nrow(pmids_df) == 0) {
   dat$title <- hacky_cleaning(dat$title)
   dat$authors <- hacky_cleaning(dat$authors)
   dat$journal <- remove_unacceptable_characters(dat$fulljournalname)
-  dat$publicationDate <- stringr::str_extract(dat$pubdate, "\\d{4}-\\d{2}-\\d{2}")
+  
+  # using this approach to parse publication dates from the raw pubdate field
+  # as you might encounter various date formats like "2025 Dec 19", "2022 Sep", or just "2022"
+  dat <- dat %>%
+    mutate(
+      publicationDate = parse_date_time(
+        pubdate,
+        orders = c(
+          "Y b d",  # 2025 Dec 19
+          "Y b",    # 2022 Sep
+          "Y"       # 2022
+        )
+      ),
+      publicationDate = format(publicationDate, "%Y-%m-%d")
+    )
+  failed_dates <- dat %>%
+    filter(is.na(publicationDate)) %>%
+    select(pmid, pubdate)
+
+  if (nrow(failed_dates) > 0) {
+    log_step(
+      "WARNING: Failed to parse ",
+      nrow(failed_dates),
+      " publication dates:"
+    )
+    print(failed_dates)
+  }
   dat$abstract = purrr::map(dat$pmid, get_abstract)
 
   # dat$abstract <- hacky_cleaning(dat$abstract)
@@ -366,9 +565,9 @@ dat <- dat %>%
   dat <- set_up_multiannotations(dat, "Authors")
 
   ## -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  store_as_annotations <- function(parent, list) {
+  store_as_annotations <- function(parent, dat_list) {
   purrr::map(
-    list,
+    dat_list,
     function(x) {
       file <- synapseclient$File(
         path = glue::glue("http://doi.org/{x$DOI}"),
@@ -383,19 +582,17 @@ dat <- dat %>%
         PubmedId = x$PubmedId,
         Title = x$Title,
         Year = x$Year,
-        Grant = x$Grant,
+        Grant = x$grant,
         Program = x$Program,
         publicationDate = x$publicationDate,
         DOI = x$DOI,
         Name = x$Name,
         preprint = x$preprint
       )
-      
       file$annotations[["__annotations__"]] <- reticulate::dict(
         publicationDate = "DATE"
       )
-      
-      syn$store(file, forceVersion = FALSE)
+      entity <- syn$store(file, forceVersion = FALSE)
       # make the wiki with abstract
       if (!is.null(x$abstract) && nchar(x$abstract) > 0) {
         wiki <- synapseclient$Wiki(
@@ -408,7 +605,25 @@ dat <- dat %>%
     }
   )
 }
+  # Define the expected annotation columns for validation
+  annotation_columns <- c(
+    "Authors",
+    "Journal",
+    "PubmedId",
+    "Title",
+    "Year",
+    "grant",
+    "Program",
+    "publicationDate",
+    "DOI",
+    "Name",
+    "preprint"
+  )
 
+  validate_annotations(
+    dat = dat,
+    annotation_columns = annotation_columns
+  )
   ## ----store, message=FALSE, echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------
   # parent = "syn51317180" # ELITE publications folder
   dat_list <- purrr::transpose(dat)
